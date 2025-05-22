@@ -238,7 +238,7 @@
             <h2 class="calendar-title">📅 Full Team Calendar</h2>
             <div class="calendar-container">
                 <!-- Enter iframe on next line -->
-              <iframe src="https://calendar.google.com/calendar/embed?src=c00551e5eb0c6820cbb217754544fd3e050fd5a966d4044a741fcf453a6a5441%40group.calendar.google.com&ctz=America%2FToronto" style="border: 0" width="800" height="600" frameborder="0" scrolling="no"></iframe>  
+               <iframe src="https://calendar.google.com/calendar/embed?src=c00551e5eb0c6820cbb217754544fd3e050fd5a966d4044a741fcf453a6a5441%40group.calendar.google.com&ctz=America%2FToronto" style="border: 0" width="800" height="600" frameborder="0" scrolling="no"></iframe> 
             </div>
         </div>
     </div>
@@ -300,32 +300,45 @@
             return events;
         }
 
-        // Function to parse iCal date
+        // Function to parse iCal date with proper timezone handling
         function parseICalDate(icalDate) {
             if (!icalDate) return null;
             
             // Handle different date formats
-            let dateStr = icalDate.replace(/[TZ]/g, '');
-            
-            if (dateStr.length === 8) {
-                // YYYYMMDD format
-                return new Date(
-                    parseInt(dateStr.substring(0, 4)),
-                    parseInt(dateStr.substring(4, 6)) - 1,
-                    parseInt(dateStr.substring(6, 8))
-                );
-            } else if (dateStr.length >= 12) {
-                // YYYYMMDDHHMMSS format
-                return new Date(
-                    parseInt(dateStr.substring(0, 4)),
-                    parseInt(dateStr.substring(4, 6)) - 1,
-                    parseInt(dateStr.substring(6, 8)),
-                    parseInt(dateStr.substring(8, 10)),
-                    parseInt(dateStr.substring(10, 12))
-                );
+            if (icalDate.includes('T')) {
+                // Has time component
+                if (icalDate.endsWith('Z')) {
+                    // UTC time - parse as UTC then convert to local
+                    const utcDateStr = icalDate.replace('Z', '');
+                    const year = parseInt(utcDateStr.substring(0, 4));
+                    const month = parseInt(utcDateStr.substring(4, 6)) - 1;
+                    const day = parseInt(utcDateStr.substring(6, 8));
+                    const hour = parseInt(utcDateStr.substring(9, 11));
+                    const minute = parseInt(utcDateStr.substring(11, 13));
+                    const second = parseInt(utcDateStr.substring(13, 15)) || 0;
+                    
+                    // Create UTC date and it will automatically convert to local time for display
+                    return new Date(Date.UTC(year, month, day, hour, minute, second));
+                } else {
+                    // Local time or timezone specified
+                    const dateStr = icalDate.replace(/[T]/g, '');
+                    const year = parseInt(dateStr.substring(0, 4));
+                    const month = parseInt(dateStr.substring(4, 6)) - 1;
+                    const day = parseInt(dateStr.substring(6, 8));
+                    const hour = parseInt(dateStr.substring(8, 10));
+                    const minute = parseInt(dateStr.substring(10, 12));
+                    const second = parseInt(dateStr.substring(12, 14)) || 0;
+                    
+                    return new Date(year, month, day, hour, minute, second);
+                }
+            } else {
+                // Date only, no time
+                const year = parseInt(icalDate.substring(0, 4));
+                const month = parseInt(icalDate.substring(4, 6)) - 1;
+                const day = parseInt(icalDate.substring(6, 8));
+                
+                return new Date(year, month, day);
             }
-            
-            return null;
         }
 
         // Function to categorize events based on your actual calendar naming
@@ -348,19 +361,28 @@
             const date = parseICalDate(event.dtstart);
             const endDate = parseICalDate(event.dtend);
             
+            // Debug logging to help identify timezone issues
+            console.log('Event:', event.summary);
+            console.log('Raw dtstart:', event.dtstart);
+            console.log('Parsed date:', date);
+            console.log('Local time string:', date ? date.toString() : 'null');
+            console.log('---');
+            
             if (!date) return '<div class="no-events">Unable to parse event date</div>';
             
             const options = { 
                 weekday: 'long', 
                 year: 'numeric', 
                 month: 'long', 
-                day: 'numeric' 
+                day: 'numeric',
+                timeZone: 'America/Toronto' // Explicitly set to Eastern Time
             };
             
             const timeOptions = {
                 hour: 'numeric',
                 minute: '2-digit',
-                hour12: true
+                hour12: true,
+                timeZone: 'America/Toronto' // Explicitly set to Eastern Time
             };
             
             let html = `<strong>Event:</strong> ${event.summary}<br>`;
@@ -385,10 +407,16 @@
             return html;
         }
 
-        // Function to calculate countdown
+        // Function to calculate countdown with timezone consideration
         function getCountdown(eventDate) {
             const now = new Date();
             const diff = eventDate - now;
+            
+            // Debug logging
+            console.log('Countdown calculation:');
+            console.log('Current time:', now.toString());
+            console.log('Event time:', eventDate.toString());
+            console.log('Difference (ms):', diff);
             
             if (diff <= 0) {
                 return { text: "Event has started!", urgent: true };
